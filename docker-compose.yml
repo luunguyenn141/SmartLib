@@ -1,0 +1,44 @@
+﻿services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: smartlib
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  ai_service:
+    build: ./ai_service
+    environment:
+      DB_NAME: smartlib
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_HOST: db
+      DB_PORT: 5432
+      MODEL_NAME: all-MiniLM-L6-v2
+      GOOGLE_BOOKS_API_KEY: ${GOOGLE_BOOKS_API_KEY:-}
+    depends_on:
+      - db
+    ports:
+      - "8000:8000"
+
+  backend:
+    build: ./backend
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/smartlib
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      AI_SERVICE_URL: http://ai_service:8000
+      JWT_SECRET: change-me-to-a-long-random-secret-key-please
+      JWT_EXPIRATION_MS: 3600000
+    depends_on:
+      - db
+      - ai_service
+    ports:
+      - "8080:8080"
+
+volumes:
+  db_data:

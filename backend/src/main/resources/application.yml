@@ -1,0 +1,23 @@
+﻿spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/smartlib}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false
+
+server:
+  port: ${SERVER_PORT:8080}
+
+ai:
+  service:
+    base-url: ${AI_SERVICE_URL:http://localhost:8000}
+
+jwt:
+  secret: ${JWT_SECRET:change-me-to-a-long-random-secret-key-please}
+  expiration-ms: ${JWT_EXPIRATION_MS:3600000}
