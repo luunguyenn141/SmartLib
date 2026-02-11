@@ -1,12 +1,10 @@
 package com.smartlib.backend.controller;
 
-import com.smartlib.backend.dto.UserCreateRequest;
 import com.smartlib.backend.entity.User;
 import com.smartlib.backend.service.UserService;
-import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import java.security.Principal;
 
 @RestController
 @RequestMapping("/api/users")
@@ -17,13 +15,8 @@ public class UserController {
         this.userService = userService;
     }
 
-    @GetMapping
-    public List<User> list() {
-        return userService.findAll();
-    }
-
-    @PostMapping
-    public User create(@Valid @RequestBody UserCreateRequest req) {
-        return userService.create(req);
+    @GetMapping("/me")
+    public User me(Principal principal) {
+        return userService.findByUsername(principal.getName());
     }
 }

@@ -23,6 +23,12 @@ public class BookService {
 
     public Page<Book> search(String q, Boolean available, Pageable pageable) {
         String trimmed = (q == null || q.isBlank()) ? null : q.trim();
+        if (trimmed == null) {
+            if (Boolean.TRUE.equals(available)) {
+                return bookRepository.findByAvailableCopiesGreaterThan(0, pageable);
+            }
+            return bookRepository.findAll(pageable);
+        }
         return bookRepository.search(trimmed, available, pageable);
     }
 

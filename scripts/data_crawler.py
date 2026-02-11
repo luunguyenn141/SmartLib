@@ -21,6 +21,7 @@ GOOGLE_BOOKS_API_KEY = os.getenv("GOOGLE_BOOKS_API_KEY", "")
 USER_AGENT = "SmartLibCrawler/1.0 (+https://example.local)"
 
 # --- CAU HINH AI MODEL ---
+MODEL_NAME = os.getenv("MODEL_NAME", "paraphrase-multilingual-MiniLM-L12-v2")
 _MODEL = None
 
 
@@ -28,7 +29,7 @@ def get_model():
     global _MODEL
     if _MODEL is None:
         print("LOADING MODEL...")
-        _MODEL = SentenceTransformer("all-MiniLM-L6-v2")
+        _MODEL = SentenceTransformer(MODEL_NAME)
     return _MODEL
 
 
@@ -159,7 +160,7 @@ def save_books_to_db(books: List[dict], batch_size: int = 50) -> None:
 
         # 2. Xu ly Vector (AI Magic)
         text_to_embed = f"{title} {description}".strip() if description else title
-        embedding = get_model().encode(text_to_embed).tolist()
+        embedding = get_model().encode(text_to_embed, normalize_embeddings=True).tolist()
 
         # 3. Luu vao PostgreSQL
         try:
@@ -320,6 +321,37 @@ def backfill_isbn(max_missing: int = 0, sleep_s: float = 0.2) -> None:
     print(f"Backfill ISBN done. Updated: {updated}, Failed: {failed}")
 
 
+def reembed_all(batch_size: int = 200) -> None:
+    """Recompute embeddings for all rows (useful after changing MODEL_NAME)."""
+    conn = get_db_connection()
+    if not conn:
+        return
+
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT id, title, description
+        FROM books
+        WHERE title IS NOT NULL
+        ORDER BY id
+        """
+    )
+    rows = cur.fetchall()
+    updated = 0
+    for book_id, title, description in rows:
+        text_to_embed = f"{title} {description or ''}".strip()
+        embedding = get_model().encode(text_to_embed, normalize_embeddings=True).tolist()
+        cur.execute("UPDATE books SET embedding = %s WHERE id = %s", (embedding, book_id))
+        updated += 1
+        if updated % batch_size == 0:
+            conn.commit()
+            print(f"Re-embedded {updated} books...")
+    conn.commit()
+    cur.close()
+    conn.close()
+    print(f"Re-embedding done. Updated: {updated}")
+
+
 if __name__ == "__main__":
     if os.getenv("BACKFILL_ISBN_ONLY") == "1":
         max_missing_env = os.getenv("BACKFILL_MAX", "")
@@ -327,6 +359,11 @@ if __name__ == "__main__":
         max_missing = int(max_missing_env) if max_missing_env.isdigit() else 0
         sleep_s = float(sleep_env) if sleep_env else 0.2
         backfill_isbn(max_missing=max_missing, sleep_s=sleep_s)
+        raise SystemExit(0)
+    if os.getenv("REEMBED_ALL") == "1":
+        batch_env = os.getenv("REEMBED_BATCH", "")
+        batch_size = int(batch_env) if batch_env.isdigit() else 200
+        reembed_all(batch_size=batch_size)
         raise SystemExit(0)
     # Danh sach tu khoa de cao du lieu (Da dang chu de)
     keywords = [
@@ -405,6 +442,14 @@ if __name__ == "__main__":
             );
             """
         )
+        # Index for faster vector search
+        cur.execute(
+            """
+            CREATE INDEX IF NOT EXISTS books_embedding_hnsw
+            ON books USING hnsw (embedding vector_cosine_ops);
+            """
+        )
+        cur.execute("CREATE INDEX IF NOT EXISTS books_isbn_idx ON books (isbn);")
         # Dam bao co cot google_books_id va unique constraint
         cur.execute("ALTER TABLE books ADD COLUMN IF NOT EXISTS google_books_id TEXT;")
         cur.execute("ALTER TABLE books ADD COLUMN IF NOT EXISTS isbn TEXT;")

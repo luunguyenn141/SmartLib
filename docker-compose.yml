@@ -18,7 +18,7 @@
       DB_PASSWORD: postgres
       DB_HOST: db
       DB_PORT: 5432
-      MODEL_NAME: all-MiniLM-L6-v2
+      MODEL_NAME: paraphrase-multilingual-MiniLM-L12-v2
       GOOGLE_BOOKS_API_KEY: ${GOOGLE_BOOKS_API_KEY:-}
     depends_on:
       - db

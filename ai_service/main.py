@@ -13,7 +13,7 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "postgres")
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = os.getenv("DB_PORT", "5432")
 
-MODEL_NAME = os.getenv("MODEL_NAME", "all-MiniLM-L6-v2")
+MODEL_NAME = os.getenv("MODEL_NAME", "paraphrase-multilingual-MiniLM-L12-v2")
 TOP_K_DEFAULT = int(os.getenv("TOP_K_DEFAULT", "10"))
 TOP_K_MAX = int(os.getenv("TOP_K_MAX", "50"))
 EF_SEARCH_DEFAULT = int(os.getenv("EF_SEARCH_DEFAULT", "64"))
@@ -85,7 +85,7 @@ def search_books(payload: SearchRequest):
     if not query:
         raise HTTPException(status_code=400, detail="query is empty")
 
-    embedding = _model.encode(query).tolist()
+    embedding = _model.encode(query, normalize_embeddings=True).tolist()
     vec_literal = to_pgvector(embedding)
     ef_search = payload.ef_search
     if ef_search is None:

@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface BookRepository extends JpaRepository<Book, Long> {
+    Page<Book> findByAvailableCopiesGreaterThan(int availableCopies, Pageable pageable);
+
     @Query("""
         SELECT b FROM Book b
         WHERE (:q IS NULL OR LOWER(b.title) LIKE LOWER(CONCAT('%', :q, '%'))

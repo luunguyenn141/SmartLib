@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { apiPost } from '../lib/api'
 
 type SearchResult = {
@@ -33,12 +33,12 @@ export default function HomePage() {
   }
 
   return (
-    <div className="page hero">
+    <div className="page hero smart-search">
       <section className="hero-card">
         <div className="hero-copy">
-          <h1>Find the next book you actually want to read.</h1>
+          <h1>SmartSearch - semantic discovery</h1>
           <p>
-            Search by meaning, not exact keywords. Try: “cậu bé phù thủy có vết sẹo”.
+            Search by meaning, not exact keywords. Try: "cậu bé phù thủy có vết sẹo".
           </p>
           <div className="search-bar">
             <input
@@ -69,14 +69,19 @@ export default function HomePage() {
       </section>
 
       <section className="results">
-        <h2>Semantic Results</h2>
+        <h2>SmartSearch Results</h2>
         <div className="grid">
           {results.map((r) => (
-            <div key={r.id} className="card">
-              <div className="card-title">{r.title}</div>
-              <div className="card-meta">{r.author || 'Unknown'} · {r.published_date || 'N/A'}</div>
-              <div className="card-desc">{r.description || 'No description available.'}</div>
-              <div className="card-score">Score: {r.score.toFixed(3)}</div>
+            <div key={r.id} className="card book-card">
+              <div className="book-cover">
+                {r.image_url ? <img src={r.image_url} alt={r.title} /> : <div className="cover-fallback">No Cover</div>}
+              </div>
+              <div className="book-info">
+                <div className="card-title">{r.title}</div>
+                <div className="card-meta">{r.author || 'Unknown'} · {r.published_date || 'N/A'}</div>
+                <div className="card-desc">{r.description || 'No description available.'}</div>
+                <div className="card-score">Score: {r.score.toFixed(3)}</div>
+              </div>
             </div>
           ))}
           {!results.length && (

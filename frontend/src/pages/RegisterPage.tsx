@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiPost } from '../lib/api'
 import type { AuthResponse } from '../lib/api'
-import { useAuth } from '../lib/useAuth'
+import { useAuth } from '../lib/auth'
 
 export default function RegisterPage() {
   const { login } = useAuth()
@@ -20,7 +20,7 @@ export default function RegisterPage() {
     try {
       const res = await apiPost<AuthResponse>('/api/auth/register', { username, email, password })
       login(res.token)
-      navigate('/books')
+      navigate('/')
     } catch (err) {
       setError((err as Error).message)
     } finally {
