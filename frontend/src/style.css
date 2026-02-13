@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500&display=swap&subset=vietnamese');
 
 :root {
   color-scheme: light;
@@ -19,7 +19,11 @@
 
 body {
   margin: 0;
-  font-family: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  font-family: 'Noto Sans', 'Segoe UI', Tahoma, system-ui, -apple-system, sans-serif;
+  line-height: 1.45;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   color: var(--ink);
   background:
     radial-gradient(1200px 600px at 10% -10%, var(--bg-2), transparent),
@@ -45,7 +49,7 @@ a {
   position: sticky;
   top: 0;
   backdrop-filter: blur(6px);
-  background: rgba(245, 239, 232, 0.75);
+  background: rgba(0, 0, 0, 0.8);
   border-bottom: 1px solid var(--stroke);
   z-index: 5;
 }
@@ -60,6 +64,7 @@ a {
   font-weight: 700;
   font-size: 22px;
   letter-spacing: 0.5px;
+  color: var(--accent);
 }
 
 .tagline {
@@ -77,21 +82,27 @@ a {
 }
 
 .nav a {
-  color: var(--muted);
+  color:#f4efe7;
   font-weight: 600;
 }
 
 .nav a.active {
-  color: var(--ink);
+  color: var(--accent);
 }
 
 .ghost {
-  border: 1px solid var(--stroke);
-  background: transparent;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
   color: var(--ink);
   padding: 8px 14px;
   border-radius: 999px;
   cursor: pointer;
+}
+
+.header .ghost {
+  border-color: rgba(244, 239, 231, 0.45);
+  background: transparent;
+  color: #f4efe7;
 }
 
 main {
@@ -334,8 +345,17 @@ button {
 }
 
 button:disabled {
-  opacity: 0.7;
-  cursor: default;
+  opacity: 1;
+  cursor: not-allowed;
+  background: #e2e8f0;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+
+button.ghost:disabled {
+  background: #f8fafc;
+  color: #64748b;
+  border-color: #cbd5e1;
 }
 
 .hero-panel {
@@ -425,6 +445,7 @@ button:disabled {
 
 .card-title {
   font-weight: 700;
+  line-height: 1.35;
   margin-bottom: 6px;
 }
 
@@ -616,6 +637,48 @@ button:disabled {
 
 .loading {
   color: var(--muted);
+}
+
+.session-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: grid;
+  place-items: center;
+  z-index: 20;
+}
+
+.session-modal {
+  width: min(460px, 92vw);
+  background: var(--card);
+  border: 1px solid var(--stroke);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 12px;
+}
+
+.session-modal h3 {
+  margin: 0;
+}
+
+.session-modal p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.session-modal label {
+  display: grid;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.session-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 @keyframes fadeUp {

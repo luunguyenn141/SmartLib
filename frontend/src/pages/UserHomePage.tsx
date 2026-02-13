@@ -32,6 +32,13 @@ type RecentSession = {
   pagesRead: number
 }
 
+type ReadingSessionItem = {
+  id: number
+  bookId: number
+  minutesRead: number
+  pagesRead: number
+}
+
 type MonthlyCount = {
   month: string
   count: number
@@ -100,6 +107,10 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
+function normalizeText(value?: string | null): string {
+  return (value ?? '').normalize('NFC')
+}
+
 export default function UserHomePage() {
   const { token } = useAuth()
   const [me, setMe] = useState<User | null>(null)
@@ -113,6 +124,11 @@ export default function UserHomePage() {
   const [sessionBusyBookId, setSessionBusyBookId] = useState<number | null>(null)
   const [activeSessionMyBookId, setActiveSessionMyBookId] = useState<number | null>(null)
   const [activeSessionBookId, setActiveSessionBookId] = useState<number | null>(null)
+  const [lastPageByBook, setLastPageByBook] = useState<Record<number, number>>({})
+  const [totalMinutesByBook, setTotalMinutesByBook] = useState<Record<number, number>>({})
+  const [stopModalOpen, setStopModalOpen] = useState(false)
+  const [stopCurrentPage, setStopCurrentPage] = useState('')
+  const [pendingStop, setPendingStop] = useState<{ myBookId: number; bookId: number } | null>(null)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [sessionMessage, setSessionMessage] = useState<string | null>(null)
   const [savingGoals, setSavingGoals] = useState(false)
@@ -123,10 +139,11 @@ export default function UserHomePage() {
     setLoading(true)
     setError(null)
     try {
-      const [user, books, dash] = await Promise.all([
+      const [user, books, dash, sessions] = await Promise.all([
         apiGet<User>('/api/users/me', token),
         apiGet<MyBook[]>('/api/my/books', token),
-        apiGet<Dashboard>('/api/my/dashboard', token)
+        apiGet<Dashboard>('/api/my/dashboard', token),
+        apiGet<ReadingSessionItem[]>('/api/my/sessions', token)
       ])
       setMe(user)
       setMyBooks(books)
@@ -134,6 +151,16 @@ export default function UserHomePage() {
       setDashboard(normalized)
       setGoalBooks(normalized.booksPerMonthGoal)
       setGoalMinutes(normalized.minutesPerDayGoal)
+      const pageMap: Record<number, number> = {}
+      const minutesMap: Record<number, number> = {}
+      for (const s of sessions) {
+        const key = s.bookId
+        if (!key) continue
+        pageMap[key] = (pageMap[key] || 0) + (s.pagesRead || 0)
+        minutesMap[key] = (minutesMap[key] || 0) + (s.minutesRead || 0)
+      }
+      setLastPageByBook(pageMap)
+      setTotalMinutesByBook(minutesMap)
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -200,26 +227,56 @@ export default function UserHomePage() {
     setElapsedSeconds(0)
   }
 
-  const stopReadingSession = async (myBookId: number) => {
-    if (!token || activeSessionMyBookId !== myBookId || activeSessionBookId === null) return
-    setSessionBusyBookId(myBookId)
+  const openStopSessionModal = (myBookId: number, bookId: number) => {
+    const lastPage = lastPageByBook[bookId] ?? 0
+    setPendingStop({ myBookId, bookId })
+    setStopCurrentPage(String(lastPage))
+    setStopModalOpen(true)
+    setError(null)
+    setSessionMessage(null)
+  }
+
+  const closeStopSessionModal = () => {
+    setStopModalOpen(false)
+    setPendingStop(null)
+    setStopCurrentPage('')
+  }
+
+  const submitStopReadingSession = async () => {
+    if (!token || !pendingStop || activeSessionMyBookId !== pendingStop.myBookId || activeSessionBookId === null) return
+    const currentPage = Number(stopCurrentPage)
+    if (!Number.isInteger(currentPage) || currentPage < 0) {
+      setError('Current page must be a non-negative integer.')
+      return
+    }
+
+    const previousPage = lastPageByBook[pendingStop.bookId] ?? 0
+    if (currentPage < previousPage) {
+      setError(`Current page cannot be less than previous page (${previousPage}).`)
+      return
+    }
+
+    const pagesRead = currentPage - previousPage
+    setSessionBusyBookId(pendingStop.myBookId)
     setError(null)
     setSessionMessage(null)
     try {
       const minutesRead = Math.max(1, Math.round(elapsedSeconds / 60))
       await apiPost('/api/my/sessions', {
-        bookId: activeSessionBookId,
+        bookId: pendingStop.bookId,
         sessionDate: todayIso(),
         minutesRead,
-        pagesRead: 0,
+        pagesRead,
         note: 'Tracked with reading timer'
       }, token)
-      await apiPatch(`/api/my/books/${myBookId}`, { status: 'READING' }, token)
+      await apiPatch(`/api/my/books/${pendingStop.myBookId}`, { status: 'READING' }, token)
       await loadPersonalData()
-      setSessionMessage(`Session saved: ${minutesRead} minute(s).`)
+      setLastPageByBook((prev) => ({ ...prev, [pendingStop.bookId]: currentPage }))
+      setSessionMessage(`Session saved: ${minutesRead} minute(s), +${pagesRead} page(s).`)
     } catch (e) {
       setError((e as Error).message)
     } finally {
+      closeStopSessionModal()
       setActiveSessionMyBookId(null)
       setActiveSessionBookId(null)
       setElapsedSeconds(0)
@@ -229,14 +286,16 @@ export default function UserHomePage() {
 
   const finishBook = async (myBookId: number) => {
     if (activeSessionMyBookId === myBookId) {
-      await stopReadingSession(myBookId)
+      setError('Please stop the active session first and enter current page.')
+      return
     }
     await updateMyBook(myBookId, { status: 'FINISHED' })
   }
 
   const dropBook = async (myBookId: number) => {
     if (activeSessionMyBookId === myBookId) {
-      await stopReadingSession(myBookId)
+      setError('Please stop the active session first and enter current page.')
+      return
     }
     await updateMyBook(myBookId, { status: 'DROPPED' })
   }
@@ -352,16 +411,18 @@ export default function UserHomePage() {
                 {item.imageUrl ? <img src={item.imageUrl} alt={item.title} /> : <div className="cover-fallback">No Cover</div>}
               </div>
               <div className="book-info">
-                <div className="card-title">{item.title}</div>
-                <div className="card-meta">{item.author || 'Unknown'}</div>
+                <div className="card-title">{normalizeText(item.title)}</div>
+                <div className="card-meta">{normalizeText(item.author) || 'Unknown'}</div>
                 <div className="card-meta">
                   Session timer: {activeSessionMyBookId === item.id ? formatDuration(elapsedSeconds) : '00:00:00'}
                 </div>
+                <div className="card-meta">Total minutes read: {totalMinutesByBook[item.bookId] ?? 0}</div>
+                <div className="card-meta">Current page: {lastPageByBook[item.bookId] ?? 0}</div>
                 <div className="loan-actions">
                   {activeSessionMyBookId === item.id ? (
                     <button
                       className="ghost"
-                      onClick={() => stopReadingSession(item.id)}
+                      onClick={() => openStopSessionModal(item.id, item.bookId)}
                       disabled={sessionBusyBookId === item.id}
                     >
                       Stop session
@@ -465,9 +526,9 @@ export default function UserHomePage() {
                 {r.image_url ? <img src={r.image_url} alt={r.title} /> : <div className="cover-fallback">No Cover</div>}
               </div>
               <div className="book-info">
-                <div className="card-title">{r.title}</div>
+                <div className="card-title">{normalizeText(r.title)}</div>
                 <div className="card-meta">
-                  {r.author || 'Unknown'} | score {typeof r.score === 'number' ? r.score.toFixed(3) : 'N/A'}
+                  {normalizeText(r.author) || 'Unknown'} | score {typeof r.score === 'number' ? r.score.toFixed(3) : 'N/A'}
                 </div>
                 <div className="card-desc">{r.description || 'No description available.'}</div>
                 <div className="loan-actions">
@@ -480,6 +541,29 @@ export default function UserHomePage() {
           {recommendations.length === 0 && <div className="card empty">No recommendations yet.</div>}
         </div>
       </section>
+
+      {stopModalOpen && pendingStop && (
+        <div className="session-modal-backdrop">
+          <div className="session-modal">
+            <h3>Stop Reading Session</h3>
+            <p>Enter your current page to save this session.</p>
+            <label>
+              Current page
+              <input
+                type="number"
+                min={0}
+                step={1}
+                value={stopCurrentPage}
+                onChange={(e) => setStopCurrentPage(e.target.value)}
+              />
+            </label>
+            <div className="session-modal-actions">
+              <button className="ghost" onClick={closeStopSessionModal}>Cancel</button>
+              <button onClick={submitStopReadingSession}>Save session</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
